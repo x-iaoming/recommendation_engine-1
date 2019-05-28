@@ -18,10 +18,18 @@ FAILURE = False
 
 
 class Pdf:
+    """
+        Probability Density Function (PDF) calculates and stores the 
+        PDF of the sucessess and failures of a reaction. In the context of 
+        perovskites, success = crystals of size 3,4; failure = crystals of size 1,2
+    """
+
     def __init__(self, group: dict) -> None:
+        # self.group is a list of descriptors of multiple reactions using the same
+        # set of compounds
         self.group = group
+        # Count the number of sucessess in each reaction group
         self.success_count = self.group['result'].count(True)
-        #self.success_count = self.count_successes()
         self.descriptor_normal = self.calc_pdf()
         self.success_descriptor_normal, self.failure_descriptor_normal = \
             self.calc_joint_pdfs()
@@ -44,6 +52,7 @@ class Pdf:
 
         """
         descriptor_normal = None
+        # check if enough samples are available to calculate pdf
         if self.success_count <= 1 or len(self.group['result']) - self.success_count <= 1:
             return None
         else:
@@ -63,6 +72,11 @@ class Pdf:
         return descriptor_normal
 
     def calc_joint_pdfs(self):
+        """
+            Calculate the joint probability distribution function of reactions
+            Returns:
+                tuple of success pdf, failure pdf
+        """
         if self.success_count <= 1 or len(self.group['result']) - self.success_count <= 1:
             return (None, None)
         else:
@@ -94,6 +108,12 @@ class Pdf:
         return (success_descriptor_normal, failure_descriptor_normal)
 
     def calculate_mutual_information(self):
+        """
+            Calculate the Mutual information of all reactions of a particular group
+
+            Returns:
+                mutual_information float value
+        """
         mutual_information = None
         if self.descriptor_normal:
             mutual_information = 0.0
@@ -102,6 +122,15 @@ class Pdf:
         return mutual_information
 
     def row_mutual_information(self, row: list) -> float:
+        """
+            Calculate the mutual information of a single row of a particular group of reactions
+
+            Args:
+                row: list of descriptors
+
+            Returns:
+                mutual_information: float value of MI
+        """
         mutual_information = 0.0
         feature = self.prob_feature(row)
         if feature:
@@ -111,18 +140,37 @@ class Pdf:
                     math.log(joint / (self.success_mean*feature), 2)
             joint = self.prob_joint(row, FAILURE)
             if joint > 1e-300:
-                print(joint, self.fail_mean * feature)
                 mutual_information += joint * \
                     math.log(joint / (self.fail_mean*feature), 2)
         return mutual_information
 
     def prob_feature(self, row):
+        """
+            Calculate the probability that a particular reaction belongs in this set?
+
+            Args:
+                row: list of descriptors
+
+            Returns:
+                pdf: probability density function 
+        """
         if self.descriptor_normal:
             return self.descriptor_normal.pdf(row)
         else:
             return 0.0
 
     def prob_joint(self, row, result):
+        """
+            Calculate joint pdf based on outcome
+
+            Args:
+                row: list of descriptors
+                result: boolean value indicating the sucess of the experiment
+
+            Returns:
+                pdf: probability density function
+        """
+
         if result:
             return self.success_descriptor_normal.pdf(row)
         else:
@@ -138,7 +186,10 @@ class Pdf:
 
 
 class MutualInformation:
-    def __init__(self, dataset: pd.DataFrame, result_column_label: str, descriptors_to_keep: list) -> None:
+    def __init__(self, dataset: pd.DataFrame,
+                 result_column_label: str,
+                 compound_column_labels: list,
+                 descriptors_to_keep: list) -> None:
         """
         Mutual information calculator
 
@@ -150,6 +201,7 @@ class MutualInformation:
         self.descriptors_to_keep = descriptors_to_keep
         self.descriptors = dataset[self.descriptors_to_keep]
         self.labels = dataset[self.result_column_label]
+        self.compound_labels = compound_column_labels
 
         self.groups = self._group_dataset(self.dataset)
 
@@ -166,8 +218,8 @@ class MutualInformation:
         """
         groups = {}  # type:dict
         for idx, row in self.dataset.iterrows():
-            key = frozenset((row['XXXi0rg1'],
-                             row['XXXi0rg1'], row['XXXorg1']))
+            key = frozenset((row[label] for label in self.compound_labels))
+
             # key = frozenset((row['compound_0'],
             #                 row['compound_1'], row['compound_2']))
             if key in groups:
@@ -202,6 +254,15 @@ class MutualInformation:
         return groups
 
     def get_delta_mutual_info(self, candidate: np.array) -> float:
+        """
+        Calculate the change in mutual info due to the addition of a 
+        candidate reaction to a set of reactions
+
+        Args:
+            candidate: list/array of descriptors of the potential reaction
+        Returns:
+            delta_mutual_info: Change in mutual information
+        """
         best_compounds = None
         best_probability = 0.0
         delta_mutual_info = 0.0
@@ -226,8 +287,9 @@ if __name__ == "__main__":
     desc_to_keep_testing = [col for col in dataset.columns if col not in DESCRIPTORS_TO_REMOVE] + [
         'boolean_crystallisation_outcome_manual_0']
     dataset_new = dataset_new[desc_to_keep_testing].values
+    compound_column_labels = ['compound_0', 'compound_1', 'compound_2']
     mi = MutualInformation(
-        dataset_org, 'boolean_crystallisation_outcome_manual_0', descriptors_to_keep)
+        dataset_org, 'boolean_crystallisation_outcome_manual_0', compound_column_labels, descriptors_to_keep)
 
     #print([group['pdf'].descriptor_normal for group in mi.groups.values()])
     print([mi.get_delta_mutual_info(row[:268].astype(float))

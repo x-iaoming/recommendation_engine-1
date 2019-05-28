@@ -15,7 +15,10 @@ descriptors_to_keep_training = [
 
 descriptors_to_remove_testing = ['outcome (actual)', 'predicted outcome']
 
-mi = MutualInformation(training_set, 'outcome', descriptors_to_keep_training)
+compound_labels = ['XXXi0rg1', 'XXXi0rg1', 'XXXorg1']
+
+mi = MutualInformation(training_set, 'outcome',
+                       compound_labels, descriptors_to_keep_training)
 
 testing_descriptors = test_set[descriptors_to_keep_training].values
 
