@@ -1,0 +1,37 @@
+The original format of the triples and amounts data structure is as follows:
+
+{
+    (<Compound: Sodium metavanadate>, <Compound: Sodium tellurite>, <Compound: Pyrimidin-2,4,6-triamin>): 
+        [(Decimal('2.432695087131013360088715214'), Decimal('2.074499319823648146180813768'), Decimal('3.957651886453927976419325900'))], 
+    
+    (<Compound: Sodium metavanadate>, <Compound: Sodium tellurite>, <Compound: N,N,N′,N′-Tetramethyl-1,3-propanediamine>): 
+        [(Decimal('2.432695087131013360088715214'), Decimal('2.074499319823648146180813768'), Decimal('4.758421518906125242386221056'))]
+}
+
+Keys are "triples" or a set of 3 compounds. Values are a list of amounts in an unknown unit. To make the data structure clearer we can use the following format:
+A list of dictionaries which contains 2 keys, "compounds" that list the compounds and "amounts that list the corresponding amounts
+[    {
+        "compounds": [
+            "Sodium metavanadate",
+            "Sodium tellurite",
+            "Pyrimidin-2,4,6-triamin"
+        ],
+        "amounts": [
+            2.432695087131013360088715214,
+            2.074499319823648146180813768,
+            3.957651886453927976419325900
+        ]
+    },
+    {
+        "compounds": [
+            "Sodium metavanadate",
+            "Sodium tellurite",
+            "N,N,N′,N′-Tetramethyl-1,3-propanediamine"
+        ],
+        "amounts": [
+            2.432695087131013360088715214,
+            2.074499319823648146180813768,
+            4.758421518906125242386221056
+        ]
+    }
+]
