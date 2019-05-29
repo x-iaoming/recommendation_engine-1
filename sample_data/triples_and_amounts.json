@@ -1,5 +1,5 @@
-{
-    "Reaction 1": {
+[
+    {
         "compounds": [
             "Sodium metavanadate",
             "Sodium tellurite",
@@ -11,7 +11,7 @@
             3.957651886453927976419325900
         ]
     },
-    "Reaction 2": {
+    {
         "compounds": [
             "Sodium metavanadate",
             "Sodium tellurite",
@@ -23,4 +23,4 @@
             4.758421518906125242386221056
         ]
     }
-}
+]
