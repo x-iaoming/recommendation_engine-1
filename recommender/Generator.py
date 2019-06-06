@@ -129,9 +129,6 @@ class Generator:
         """
         This helper function generates expaneded descriptors for one reaction
         """
-
-        # df to search for the expanded descriptors based on compound smile code 
-        df = self.descriptor_dataframe
         # number of compounds to find respective descriptors
         total_compounds = len(self.compounds_data[0]['compounds'])
 
@@ -139,19 +136,26 @@ class Generator:
         for i in range(total_compounds):
             # get the smile code of the ith compound in the reaction
             smile = self.all_combos.iloc[iter_no][i]
-            # find the matching descriptors for the ith compound in df
-            compound_i_desc_df = df[df['Compound'] == smile]
-            # convert compound_i_desc_df to a list
-            compound_i_desc = compound_i_desc_df.values.tolist()[0][1:]
+            # find the respective expanded descriptors
+            compound_i_desc = self.dic[smile]
             # combining the expanded descriptors for every ith compound in the reaction
             temp += compound_i_desc
 
         return temp
 
     def generate_expanded_grid(self):
+
         """
         This function generates expaneded descriptors for all reactions
         """
+        
+        # Create a dictionary to get expanded descriptors for compounds
+        self.dic = {}
+        df = self.descriptor_dataframe
+        desc_len = df.shape[0]
+        for i in range(desc_len):
+            value = df.iloc[i].tolist()
+            self.dic[df.iloc[i][0]] = value[1:]
 
         expanded_grid = []
         # iterate over n reactions in all_combos
@@ -164,40 +168,6 @@ class Generator:
 
         # merge the original combos with the expaneded grid
         self.all_combos_expanded = pd.concat([self.all_combos,expanded_grid_df],axis = 1)
-
-            
-
-
-        # desc_dict = self.desc_dict()
-
-        # self.descriptor_dataframe
-        # total_compounds = len(self.compounds_data[0]['compounds'])
-        # for i in range(total_compounds):
-        #     self.all_combos.columns[i]
-
-        # self.dic = {}
-        # for row in reader:
-        #     self.dic[row[0]] = row[1:]
-        # # loops through all_combos and adds the descriptors in each reaction
-        # for reactionindex in range(len(self.all_combos)):
-        #     for i in range(3):
-        #         # Checks to see the compound names are in the first or second column.
-        #         if isinstance(self.all_combos[reactionindex][1][i], str):
-        #             compound = self.all_combos[reactionindex][1][i]
-        #         else:
-        #             compound = self.all_combos[reactionindex][0][i]
-        #         # Extracts the descriptors of each compound
-        #         descip = self.dic[compound]
-        #         self.all_combos[reactionindex] += [descip]
-
-        # name_params = list(self.params_grid_data.keys())
-        # # set the names for the 13 columns in the expanded grid
-        # headers = ["compounds", "amounts"] + name_params + \
-        #     ["C1descriptor", "C2descriptor", "C3descriptor"]
-
-        # newdf = pd.DataFrame(self.all_combos, columns=headers)
-
-        # return newdf
 
     def sieve(self, desired_des, predictions):
         index_of_undesireddic = set()
