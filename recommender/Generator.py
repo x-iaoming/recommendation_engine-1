@@ -140,8 +140,8 @@ class Generator:
             # get the smile code of the ith compound in the reaction
             smile = self.all_combos.iloc[iter_no][i]
             # find the matching descriptors for the ith compound in df
-            compound_i_desc_df = df[df['Compound'] == smile][:]
-            # convert them to a list
+            compound_i_desc_df = df[df['Compound'] == smile]
+            # convert compound_i_desc_df to a list
             compound_i_desc = compound_i_desc_df.values.tolist()[0][1:]
             # combining the expanded descriptors for every ith compound in the reaction
             temp += compound_i_desc
