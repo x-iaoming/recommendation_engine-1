@@ -84,7 +84,7 @@ class Generator:
 
         return names
 
-    def generate_descriptors(self, descriptor_list):
+    def generate_descriptors(self, descriptor_list, output_filename):
         """
         Generates descirptors from a file of smile codes and the desired descriptors,
         and stores the output as a csv file
@@ -104,7 +104,8 @@ class Generator:
         cag = ChemAxonDescriptorGenerator(self.compound_set,
                                           descriptor_list,
                                           list(ph_values))
-        self.descriptor_dataframe = cag.generate('opnew.csv', dataframe=True)
+        self.descriptor_dataframe = cag.generate(
+            output_filename, dataframe=True)
         # print(self.descriptor_dataframe)
         # print(
         # self.descriptor_dataframe[['Compound'] + [col for col in self.descriptor_dataframe.columns if ('7' in col)]])
