@@ -34,15 +34,15 @@ Steps to implement a recommender pipeline
 
 def generate_reaction_grid():
     # Setting up reaction parameters
-    grid_params_filename = './sample_data/grid_params.json'
-    compounds_filename = './sample_data/triples_and_amounts.json'
+    grid_params_filename = '../sample_data/grid_params.json'
+    compounds_filename = '../sample_data/triples_and_amounts.json'
     reaction_generator = Generator(compounds_filename, grid_params_filename)
 
     # Generate a reaction grid with only the compounds and their parameters
     reaction_generator.generate_grid()
 
     # Generate descriptors of all the compounds in the data given
-    descriptor_list_file = './sample_data/descriptors_list.json'
+    descriptor_list_file = '../sample_data/descriptors_list.json'
     reaction_generator.generate_descriptors(descriptor_list_file)
 
     # Combine the grid with the generated descriptors
@@ -60,7 +60,8 @@ def reaction_sieve(reaction_generator):
 
 def recommend(potential_reactions, top_k):
 
-    dataset = pd.read_csv('~/test_data_full.csv', low_memory=False)
+    dataset = pd.read_csv(
+        '../sample_data/test_data_full.csv', low_memory=False)
     dataset_org = dataset.iloc[:6000]
     dataset_new = dataset.iloc[-100:]
     descriptors_to_keep = [
