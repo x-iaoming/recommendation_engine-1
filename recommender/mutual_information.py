@@ -290,7 +290,7 @@ class MutualInformation:
         """
         mi_values = {}
         for i, descriptors in enumerate(potential_reactions):
-            mi_values[i] = mi.get_delta_mutual_info(descriptors)
+            mi_values[i] = self.get_delta_mutual_info(descriptors)
 
         sorted_mi = sorted(mi_values.items(), key=lambda kv: kv[1])
 

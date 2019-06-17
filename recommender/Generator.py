@@ -38,8 +38,14 @@ class Generator:
             raise Exception(
                 "'params' should be a path or dict. Found: {}".format(type(params)))
         self.all_combos = []
+        self.total_compounds = len(self.compounds_data[0]['compounds'])
+        self.compound_set = set()
 
-    def generate(self):
+        for experiment in self.compounds_data:
+            for compound in experiment['compounds']:
+                self.compound_set.add(compound)
+
+    def generate_grid(self):
         """
         Generates all combinitions of compounds, their amounts, and parameters
         and store them in the 2-d array called self.all_combos
@@ -49,32 +55,30 @@ class Generator:
 
         # Generate a list of all combos for params
         params_combos = list(product(*list_params))
-        names = self.generate_column_names()
+        names = self._generate_column_names()
 
         # Loop over the array of dictionary for the compounds and amounts:
         for experiment in self.compounds_data:
             for params in params_combos:
                 compounds = experiment['compounds']
-                #amounts = list(experiment.values())[1]
                 amounts = experiment['amounts']
                 self.all_combos += [chain(compounds, amounts,
                                           params)]
         self.all_combos = pd.DataFrame.from_records(self.all_combos)
         self.all_combos.columns = names
-        #print(names)
-        #print(self.all_combos.head())
+        return self.all_combos
 
-    def generate_column_names(self):
+    def _generate_column_names(self):
         """
         Generates column names for the final dataframe based on the input values
         Used in self.generate()
         """
         names = []
         # Assuming same number of compounds for every reaction!
-        total_compounds = len(self.compounds_data[0]['compounds'])
-        names = ['compound_{}'.format(i) for i in range(total_compounds)]
+
+        names = ['compound_{}'.format(i) for i in range(self.total_compounds)]
         names += ['compound_{}_amount'.format(i)
-                  for i in range(total_compounds)]
+                  for i in range(self.total_compounds)]
         for grid_param in self.params_grid_data.keys():
             names.append(grid_param)
 
@@ -92,20 +96,20 @@ class Generator:
             ph_command_stems:           Dict of pH related descriptors and command stems
         """
 
-        smiles = '../sample_data/test_foursmiles.smi'
+        #smiles = '../sample_data/test_foursmiles.smi'
 
         ph_values = self.params_grid_data['reaction_pH']
 
-        #print(ph_values)
-        cag = ChemAxonDescriptorGenerator(smiles,
+        # print(ph_values)
+        cag = ChemAxonDescriptorGenerator(self.compound_set,
                                           descriptor_list,
                                           list(ph_values))
         self.descriptor_dataframe = cag.generate('opnew.csv', dataframe=True)
-        #print(self.descriptor_dataframe)
-        #print(
-            #self.descriptor_dataframe[['Compound'] + [col for col in self.descriptor_dataframe.columns if ('7' in col)]])
-    
-    def generate_expanded_column_names(self):
+        # print(self.descriptor_dataframe)
+        # print(
+        # self.descriptor_dataframe[['Compound'] + [col for col in self.descriptor_dataframe.columns if ('7' in col)]])
+
+    def _generate_expanded_column_names(self):
         """
         Generates column names for dataframe in expaneded grid
         Used in self.generate_expanded_grid()
@@ -114,26 +118,21 @@ class Generator:
         names = []
         # Get names of the descriptors
         des_names = [column for column in self.descriptor_dataframe][1:]
-        # Assuming same number of compounds for every reaction!
-        total_compounds = len(self.compounds_data[0]['compounds'])
 
         # Generate expanded descriptor names for each compound
-        for i in range(total_compounds):
+        for i in range(self.total_compounds):
             for des_name in des_names:
-                name = 'compund_{}_{}'.format(i,des_name)
+                name = 'compund_{}_{}'.format(i, des_name)
                 names.append(name)
 
         return names
 
-    def generate_expanded_grid_helper(self,iter_no):
+    def _generate_expanded_grid_helper(self, iter_no):
         """
         This helper function generates expaneded descriptors for one reaction
         """
-        # number of compounds to find respective descriptors
-        total_compounds = len(self.compounds_data[0]['compounds'])
-
         temp = []
-        for i in range(total_compounds):
+        for i in range(self.total_compounds):
             # get the smile code of the ith compound in the reaction
             smile = self.all_combos.iloc[iter_no][i]
             # find the respective expanded descriptors
@@ -144,11 +143,10 @@ class Generator:
         return temp
 
     def generate_expanded_grid(self):
-
         """
         This function generates expaneded descriptors for all reactions
         """
-        
+
         # Create a dictionary to get expanded descriptors for compounds
         self.dic = {}
         df = self.descriptor_dataframe
@@ -161,75 +159,60 @@ class Generator:
         # iterate over n reactions in all_combos
         for n in range(self.all_combos.shape[0]):
             # get and combine expanded descriptors for every nth reaction
-            expanded_grid += [self.generate_expanded_grid_helper(n)]
+            expanded_grid += [self._generate_expanded_grid_helper(n)]
 
         # convert the expanded grid to a dataframe with appropriate names
-        expanded_grid_df = pd.DataFrame(expanded_grid,columns = self.generate_expanded_column_names())
+        expanded_grid_df = pd.DataFrame(
+            expanded_grid, columns=self._generate_expanded_column_names())
 
         # merge the original combos with the expaneded grid
-        self.all_combos_expanded = pd.concat([self.all_combos,expanded_grid_df],axis = 1)
-
-    def sieve(self, desired_des, predictions):
-        index_of_undesireddic = set()
-        desired_des = set(desired_des)
-
-        for desc in range(len(self.dic['Compound'])):
-            if self.dic['Compound'][desc] not in desired_des:
-                index_of_undesireddic.add(desc)
-
-        for i in range(len(self.all_combos)):
-            row = self.all_combos[i]
-            for compound in row[-3:]:
-                if len(compound) == len(desired_des):
-                    continue
-                for j in range(len(compound), -1, -1):
-                    if j in index_of_undesireddic:
-                        del compound[j]
-
-        headers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
-
-        newdf = pd.DataFrame(self.all_combos, columns=headers)
-        mlmodel.runmodel(self.all_combos)
-        result = mlmodel.result  # a list of 0 and 1
-        newdf['result'] = result
-
-        return newdf.loc[newdf['result'] == 1]
+        self.all_combos_expanded = pd.concat(
+            [self.all_combos, expanded_grid_df], axis=1)
+        return self.all_combos_expanded
 
 
 class MLmodel:
 
     def runmodel(self, reactions):
-        result = []
-        for reaction in range(len(reactions)):
-            if random.random() < 0.7:
-                num = 0
-            else:
-                num = 1
-            result.append(num)
+        result = [0 if random.random() > 0.7 else 1 for _ in range(len(reactions))]
         self.result = result
+
+    def sieve(self, reaction_dataframe, descriptor_whitelist=[]):
+        """
+        Passes sampled reactions through an ML model. Only reactions predicted as 
+        sucessful are returned
+        """
+
+        if not descriptor_whitelist:
+            self.runmodel(reaction_dataframe)
+        else:
+            self.runmodel(reaction_dataframe[descriptor_whitelist])
+        reaction_dataframe['prediction'] = self.result
+        return reaction_dataframe.loc[reaction_dataframe['prediction'] == 1]
 
 
 if __name__ == "__main__":
 
     # Running order: generate(), generateDescriptor(), expandedgrid()
-    os.environ['CXCALC_PATH'] = '/home/h205c/chemaxon/bin'
+    #os.environ['CXCALC_PATH'] = '/home/h205c/chemaxon/bin'
+    os.environ['CXCALC_PATH'] = '/Applications/MarvinSuite/bin'
 
     turl = "../sample_data/triples_and_amounts.json"
     gurl = "../sample_data/grid_params.json"
     test = Generator(turl, gurl)
-    test.generate()
-    print(test.all_combos)
+    test.generate_grid()
+    # print(test.all_combos)
 
     desf = '../sample_data/descriptors_list.json'
     test.generate_descriptors(desf)
-    print(test.descriptor_dataframe)
+    # print(test.descriptor_dataframe)
 
     test.generate_expanded_grid()
-    print(test.all_combos_expanded)
+    # print(test.all_combos_expanded)
 
     # csvfile = "opnew.csv"
     # desc = test.expand_grid(csvfile)
-    # mlmodel = MLmodel()
-    # df = test.sieve(['vanderwaals_nominal', 'vanderwaals_ph7',
-    #                 'asa_nominal', 'asa_ph7'], mlmodel)
+    mlmodel = MLmodel()
+    df = mlmodel.sieve(test.all_combos_expanded)
+    print(df)
     # print(df)
