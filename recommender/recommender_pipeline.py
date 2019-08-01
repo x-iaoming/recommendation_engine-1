@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from recommender.generator import Generator, MLmodel
 from recommender.mutual_information import MutualInformation, DESCRIPTORS_TO_REMOVE
+import subprocess
 
 # This file shows an application of the recommender pipeline with the help
 # of an example
@@ -43,7 +44,8 @@ def generate_reaction_grid():
 
     # Generate descriptors of all the compounds in the data given
     descriptor_list_file = '../sample_data/descriptors_list.json'
-    reaction_generator.generate_descriptors(descriptor_list_file)
+    outputfile = '../sample_data/descriptoroutput.csv'
+    reaction_generator.generate_descriptors(descriptor_list_file,outputfile)
 
     # Combine the grid with the generated descriptors
     reaction_generator.generate_expanded_grid()
@@ -78,8 +80,8 @@ def recommend(potential_reactions, top_k):
 
 
 if __name__ == "__main__":
-    os.environ['CXCALC_PATH'] = '/Applications/MarvinSuite/bin'
+    os.environ['CXCALC_PATH'] = '/home/h205c/chemaxon/bin'
     reaction_generator = generate_reaction_grid()
-    pred_sucessful_reaction = reaction_sieve(reaction_generator)
-    recommended_reactions = recommend(pred_sucessful_reaction, 10)
-    print(recommended_reactions)
+    #pred_sucessful_reaction = reaction_sieve(reaction_generator)
+   # recommended_reactions = recommend(pred_sucessful_reaction, 10)
+    #print(recommended_reactions)
