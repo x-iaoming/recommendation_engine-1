@@ -311,11 +311,17 @@ if __name__ == "__main__":
     return a data frame of successful reactions
 
     TODO: 
-    Automatic data preprocessing
+    To do the validation, you need to do the following data preprocessing manually
     1. Remove attributes starting with XXX and implement whitelist in train()
     2. Convert attribute of "outcome" from regression (numeric) to classification {0,1} 
     3. Remove the attribute "purity", which is the second outcome instead of one of the training parameters 
     4. For validation data, change 'outcome' to '?' for weka to make predictions (see weka documentation)
+    Bugs
+    1. _convert() works but there's some error about reading unknown attributes
+    2. in train(): the weka command doesnt work as it says train and test are not compatible.
+    I checked that train.arff and test.arff have same attributes. Maybe due to bug 1?
+    3. Due to the previous errors I couldn't get the output yet, but the files
+    are generated correctly from start to end
     """
     all_data = '/home/h205c/recommendation_engine/sample_data/nature17439-s2.csv'
     validation_file = "/home/h205c/recommendation_engine/validation.csv"
