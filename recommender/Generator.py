@@ -176,17 +176,19 @@ class Generator:
 
 
 class MLmodel:
-'''
-Machine learning model class that preprocesses data, trains a model, and return predictions on validation data
-'''
+    """
+    Machine learning model class that preprocesses data, trains a model, 
+    makes predictions on validation data, and return asuccessful reactions
+    as a dataframe
+    """
     def __init__(self, 
                  model_name, 
                  all_data_path, 
                  validation_data_path, 
                  weka_path="/home/h205c/Downloads/weka-3-8-3/weka.jar"):
-    '''
-    It initializes with all_data_path and validation_data_path, which are csv files. They need to have the exact same attributes.
-    '''
+        """
+        It initializes with all_data_path and validation_data_path, which are csv files. They need to have the exact same attributes.
+        """
         self.all_data = all_data_path    
         self.model_name = model_name
         self.weka_path = weka_path
@@ -200,26 +202,25 @@ Machine learning model class that preprocesses data, trains a model, and return 
             raise Exception("This model is not recognizable")           
  
     def _convert(self,file_path):
-    '''
-    This function takes in a csv file, converts it to arrf file, and returns the path to the arff file
-    Used in 'init' and 'train'
-    '''
+        """
+        This function takes in a csv file, converts it to arrf file, and returns the path to the arff file
+        Used in 'init' and 'train'
+        """
         if file_path[-4:] != '.csv':
             raise Exception('Please input a CSV file')
 
-        # 
         command = 'java -cp '+self.weka_path+' weka.core.converters.CSVLoader '+file_path+' > '+file_path[:-4]+'.arff'
         subprocess.call(command, shell=True)
         return file_path[:-4]+'.arff'
 
     def train(self,path_to_model_file=None,descriptor_whitelist=[]):
-    '''
-    This function splits the data set and writes train and test files
-    It then trains and writes a model
-    '''
+        """
+        This function splits the data set and writes train and test files
+        It then trains and writes a model
+        """
         # TODO: Filters out descriptors not in the whitelist
-            # self.filter(self.all_data,descriptor_whitelist)
-            # self.filter(self.validation_data,descriptor_whitelist)
+        # self.filter(self.all_data,descriptor_whitelist)
+        # self.filter(self.validation_data,descriptor_whitelist)
 
         # Split all data to train and test files, NewSplitter() imported from separate file
         splitter = NewSplitter()
@@ -243,10 +244,10 @@ Machine learning model class that preprocesses data, trains a model, and return 
         #      .format(self.weka_command, path_to_model_file, train_arff, test_arff, kernel,puk_omega, puk_sigma)
     
     def _read_weka_output(self,result_path):
-    '''
-    This function reads a weka prediction output file and stores the prediction results as a list of 0 and 1
-    Used in 'predict'
-    '''
+        """
+        This function reads a weka prediction output file and stores the prediction results as a list of 0 and 1
+        Used in 'predict'
+        """
         prediction_index = 2
         ordConversion = lambda s: int(s.split(':')[1])
         with open(result_path, "r") as f:
@@ -256,12 +257,10 @@ Machine learning model class that preprocesses data, trains a model, and return 
             self.predictions = [ordConversion(
                 prediction) for prediction in raw_predictions]
 
-        print(self.predictions)
-
     def predict(self,result_path="/home/h205c/recommendation_engine/prediction.csv"):
-    '''
-    This function runs the model that is already trained and stores the prediction results
-    '''  
+        """
+        This function runs the model that is already trained and stores the prediction results
+        """ 
         # Make sure the 'train' function was called
         if not self.path_to_model_file:
             raise Exception("Please train a model first")
@@ -275,22 +274,24 @@ Machine learning model class that preprocesses data, trains a model, and return 
         self._read_weka_output(result_path)
     
     def sieve(self):
-    '''
-    This function filters out successful reactions
-    ''' 
-        # TODO: a function that appends the prediction result to validation file
-            # e.g.: self.new_column(self.validation_data,"prediction",self.prediction)
-        
-        # TODO: a function that returns only reactions with successful predictions("1")
-            # e.g.: return self.filter(self.validation_data,"prediction","1")
-        return
+        """
+        This function returns a dataframe of successful reactions
+        """
+        # Make sure the 'predict' function was called
+        if not self.predictions:
+            raise Exception("No predictions found")
+
+        validation_dataframe = pd.read_csv(self.validation_data)
+        validation_dataframe['prediction'] = self.predictions
+        return validation_dataframe.loc[validation_dataframe['prediction'] == 1]
+
 
 
 if __name__ == "__main__":
 
     # Running order: generate(), generateDescriptor(), expandedgrid()
-    os.environ['CXCALC_PATH'] = '/home/h205c/chemaxon/bin'
-    #os.environ['CXCALC_PATH'] = '/Applications/MarvinSuite/bin'
+   #  os.environ['CXCALC_PATH'] = '/home/h205c/chemaxon/bin'
+   #  # os.environ['CXCALC_PATH'] = '/Applications/MarvinSuite/bin'
    #  turl = "../sample_data/triples_and_amounts.json"
    #  gurl = "../sample_data/grid_params.json"
    #  test = Generator(turl, gurl)
@@ -298,15 +299,16 @@ if __name__ == "__main__":
    #  desf = "../sample_data/descriptors_list.json"
    #  outputfile = "/home/h205c/recommendation_engine/sample_data/descriptoroutput.txt"
    # # test.generate_descriptors(desf,outputfile)
-   # combos = test.generate_expanded_grid()
-  #  print(combos)
+   #  combos = test.generate_expanded_grid()
+   #  print(combos)
 
 
 
 
     """
-    Testing MLmodel class only, 
+    Testing MLmodel class only. After calling train,predict,and sieve: 
     generate train.csv>test.csv>train.arff>test.arff>J48.model>predict.csv
+    return a data frame of successful reactions
 
     TODO: 
     Automatic data preprocessing
@@ -320,7 +322,7 @@ if __name__ == "__main__":
     mlmodel = MLmodel("J48", all_data, validation_file)
     mlmodel.train()
     mlmodel.predict()
-    mlmodel.sieve()
+    print(mlmodel.sieve())
 
 
 
