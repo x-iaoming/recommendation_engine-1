@@ -175,25 +175,22 @@ class Generator:
         return self.all_combos_expanded
 
 
-'''
-   Machine learning model class that preprocesses data, trains a model, and return predictions on validation data
-'''
 class MLmodel:
-    '''
-    It initializes with all_data_path and validation_data_path, which are csv files. They need to have the exact same attributes.
-
-    TODO: Add more models (Sample WEKA configuration from nature paper: https://media.nature.com/original/nature-assets/nature/journal/v533/n7601/extref/nature17439-s4.txt
-    '''
+'''
+Machine learning model class that preprocesses data, trains a model, and return predictions on validation data
+'''
     def __init__(self, 
                  model_name, 
                  all_data_path, 
                  validation_data_path, 
                  weka_path="/home/h205c/Downloads/weka-3-8-3/weka.jar"):
-  
+    '''
+    It initializes with all_data_path and validation_data_path, which are csv files. They need to have the exact same attributes.
+    '''
         self.all_data = all_data_path    
         self.model_name = model_name
         self.weka_path = weka_path
-        self.validation_data = self._convert(validation_data_path)
+        self.validation_data = validation_data_path
 
         if self.model_name == "J48":
             self.weka_command = "weka.classifiers.trees.J48"
@@ -202,26 +199,29 @@ class MLmodel:
         else: 
             raise Exception("This model is not recognizable")           
  
-
+    def _convert(self,file_path):
     '''
     This function takes in a csv file, converts it to arrf file, and returns the path to the arff file
     Used in 'init' and 'train'
     '''
-    def _convert(self,file_path):
         if file_path[-4:] != '.csv':
             raise Exception('Please input a CSV file')
 
+        # 
         command = 'java -cp '+self.weka_path+' weka.core.converters.CSVLoader '+file_path+' > '+file_path[:-4]+'.arff'
         subprocess.call(command, shell=True)
         return file_path[:-4]+'.arff'
 
-
+    def train(self,path_to_model_file=None,descriptor_whitelist=[]):
     '''
     This function splits the data set and writes train and test files
     It then trains and writes a model
     '''
-    def train(self,path_to_model_file=None):
-        # Split all data to train and test files
+        # TODO: Filters out descriptors not in the whitelist
+            # self.filter(self.all_data,descriptor_whitelist)
+            # self.filter(self.validation_data,descriptor_whitelist)
+
+        # Split all data to train and test files, NewSplitter() imported from separate file
         splitter = NewSplitter()
         splitter.split(self.all_data)
 
@@ -242,54 +242,48 @@ class MLmodel:
         #     command = "java {} -d {} -t {} -T {} -K {} -O {} -S {} -p 0"
         #      .format(self.weka_command, path_to_model_file, train_arff, test_arff, kernel,puk_omega, puk_sigma)
     
-    
+    def _read_weka_output(self,result_path):
     '''
-    This function reads weka prediction output and return a list of '0's and '1's
+    This function reads a weka prediction output file and stores the prediction results as a list of 0 and 1
     Used in 'predict'
     '''
-    def _read_weka_output(self,result_path):
-        # Make sure the 'predict' function was called
         prediction_index = 2
         ordConversion = lambda s: int(s.split(':')[1])
         with open(result_path, "r") as f:
             raw_lines = f.readlines()[5:-1]
             raw_predictions = [line.split()[prediction_index]
                            for line in raw_lines]
-            predictions = [ordConversion(
+            self.predictions = [ordConversion(
                 prediction) for prediction in raw_predictions]
-            return predictions
 
+        print(self.predictions)
 
+    def predict(self,result_path="/home/h205c/recommendation_engine/prediction.csv"):
     '''
-    This function runs the model that is already trained and return a list of '0's and '1's
-    '''
-    def predict(self,result_path="/home/h205c/recommendation_engine/prediction.csv"):  
+    This function runs the model that is already trained and stores the prediction results
+    '''  
         # Make sure the 'train' function was called
         if not self.path_to_model_file:
             raise Exception("Please train a model first")
 
         # Run prediction
         command = "java -cp {} {} -T {} -l {} -p 0 1> {}".format(
-          self.weka_path, self.weka_command, self.validation_data, self.path_to_model_file, result_path) 
+          self.weka_path, self.weka_command, self._convert(self.validation_data), self.path_to_model_file, result_path) 
         subprocess.check_output(command, shell=True)
-
         
-        # Convert to a list of results and return
-        return self._read_weka_output(result_path)
-        
+        # Convert weka prediction to a list of results 
+        self._read_weka_output(result_path)
     
-    #TODO: Convert reaction_dataframe to proper arff file 
-    def sieve(self, reaction_dataframe, descriptor_whitelist=[]):
-        """
-        Passes sampled reactions through an ML model. Only reactions predicted as 
-        sucessful are returned
-        """
-
-        if not descriptor_whitelist:
-            self.runmodel(reaction_dataframe)
-        else:
-            self.runmodel(reaction_dataframe[descriptor_whitelist])
-        reaction_dataframe['prediction'] = self.result
+    def sieve(self):
+    '''
+    This function filters out successful reactions
+    ''' 
+        # TODO: a function that appends the prediction result to validation file
+            # e.g.: self.new_column(self.validation_data,"prediction",self.prediction)
+        
+        # TODO: a function that returns only reactions with successful predictions("1")
+            # e.g.: return self.filter(self.validation_data,"prediction","1")
+        return
 
 
 if __name__ == "__main__":
@@ -309,22 +303,24 @@ if __name__ == "__main__":
 
 
 
+
     """
-    Testing MLmodel class only
+    Testing MLmodel class only, 
+    generate train.csv>test.csv>train.arff>test.arff>J48.model>predict.csv
 
     TODO: 
-    Bug - the files after train and test split are not compatible
-    Data preprocessing - Remove attributes starting with XXX 2. Convert attribute of "outcome" 
-    from regression (numeric) to classification {0,1} 3. Remove the attribute "purity", which is the 
-    second outcome instead of one of the training parameters 4. For validation data, change 'outcome' to 
-    '?' for weka to make predictions (see weka documentation)
+    Automatic data preprocessing
+    1. Remove attributes starting with XXX and implement whitelist in train()
+    2. Convert attribute of "outcome" from regression (numeric) to classification {0,1} 
+    3. Remove the attribute "purity", which is the second outcome instead of one of the training parameters 
+    4. For validation data, change 'outcome' to '?' for weka to make predictions (see weka documentation)
     """
     all_data = '/home/h205c/recommendation_engine/sample_data/nature17439-s2.csv'
     validation_file = "/home/h205c/recommendation_engine/validation.csv"
     mlmodel = MLmodel("J48", all_data, validation_file)
     mlmodel.train()
     mlmodel.predict()
-
+    mlmodel.sieve()
 
 
 
