@@ -1,12 +1,13 @@
 import random
 from chemdescriptor import ChemAxonDescriptorGenerator
+from NewSplitter import NewSplitter
 import json
 from itertools import product, chain
 import pandas as pd
 import numpy as np
 import os
 import csv
-
+import subprocess
 
 class Generator:
     """
@@ -39,11 +40,11 @@ class Generator:
                 "'params' should be a path or dict. Found: {}".format(type(params)))
         self.all_combos = []
         self.total_compounds = len(self.compounds_data[0]['compounds'])
-        self.compound_set = set()
+        self.compound_set = []
 
         for experiment in self.compounds_data:
             for compound in experiment['compounds']:
-                self.compound_set.add(compound)
+                self.compound_set.append(compound)
 
     def generate_grid(self):
         """
@@ -83,6 +84,7 @@ class Generator:
             names.append(grid_param)
 
         return names
+    #TODO: Fixed bug. When I ran this function, it shows that "can't convert list to str implicitly" fpr line 110.
 
     def generate_descriptors(self, descriptor_list, output_filename):
         """
@@ -104,6 +106,7 @@ class Generator:
         cag = ChemAxonDescriptorGenerator(self.compound_set,
                                           descriptor_list,
                                           list(ph_values))
+
         self.descriptor_dataframe = cag.generate(
             output_filename, dataframe=True)
         # print(self.descriptor_dataframe)
@@ -173,47 +176,164 @@ class Generator:
 
 
 class MLmodel:
-
-    def runmodel(self, reactions):
-        result = [0 if random.random() > 0.7 else 1 for _ in range(len(reactions))]
-        self.result = result
-
-    def sieve(self, reaction_dataframe, descriptor_whitelist=[]):
+    """
+    Machine learning model class that preprocesses data, trains a model, 
+    makes predictions on validation data, and return asuccessful reactions
+    as a dataframe
+    """
+    def __init__(self, 
+                 model_name, 
+                 all_data_path, 
+                 validation_data_path, 
+                 weka_path="/home/h205c/Downloads/weka-3-8-3/weka.jar"):
         """
-        Passes sampled reactions through an ML model. Only reactions predicted as 
-        sucessful are returned
+        It initializes with all_data_path and validation_data_path, which are csv files. They need to have the exact same attributes.
         """
+        self.all_data = all_data_path    
+        self.model_name = model_name
+        self.weka_path = weka_path
+        self.validation_data = validation_data_path
 
-        if not descriptor_whitelist:
-            self.runmodel(reaction_dataframe)
-        else:
-            self.runmodel(reaction_dataframe[descriptor_whitelist])
-        reaction_dataframe['prediction'] = self.result
-        return reaction_dataframe.loc[reaction_dataframe['prediction'] == 1]
+        if self.model_name == "J48":
+            self.weka_command = "weka.classifiers.trees.J48"
+        elif self.model_name == "SVM":
+            self.weka_command = "weka.classifiers.functions.SMO"
+        else: 
+            raise Exception("This model is not recognizable")           
+ 
+    def _convert(self,file_path):
+        """
+        This function takes in a csv file, converts it to arrf file, and returns the path to the arff file
+        Used in 'init' and 'train'
+        """
+        if file_path[-4:] != '.csv':
+            raise Exception('Please input a CSV file')
+
+        command = 'java -cp '+self.weka_path+' weka.core.converters.CSVLoader '+file_path+' > '+file_path[:-4]+'.arff'
+        subprocess.call(command, shell=True)
+        return file_path[:-4]+'.arff'
+
+    def train(self,path_to_model_file=None,descriptor_whitelist=[]):
+        """
+        This function splits the data set and writes train and test files
+        It then trains and writes a model
+        """
+        # TODO: Filters out descriptors not in the whitelist
+        # self.filter(self.all_data,descriptor_whitelist)
+        # self.filter(self.validation_data,descriptor_whitelist)
+
+        # Split all data to train and test files, NewSplitter() imported from separate file
+        splitter = NewSplitter()
+        splitter.split(self.all_data)
+
+        # Set and run weka model commands
+        if not path_to_model_file:
+            self.path_to_model_file = self.model_name+'.model'
+        train_arff = self._convert("../train.csv")
+        test_arff = self._convert("../test.csv")
+        command = "java -cp {} {} -d {} -t {} -T {} -p 0".format(
+            self.weka_path, self.weka_command, self.path_to_model_file, train_arff, test_arff)
+        
+        subprocess.check_output(command, shell=True)
+        
+        # if self.model_name == "SVM":
+        #     puk_omega = 1
+        #     puk_sigma = 1
+        #     kernel = "weka.classifiers.functions.supportVector.Puk"
+        #     command = "java {} -d {} -t {} -T {} -K {} -O {} -S {} -p 0"
+        #      .format(self.weka_command, path_to_model_file, train_arff, test_arff, kernel,puk_omega, puk_sigma)
+    
+    def _read_weka_output(self,result_path):
+        """
+        This function reads a weka prediction output file and stores the prediction results as a list of 0 and 1
+        Used in 'predict'
+        """
+        prediction_index = 2
+        ordConversion = lambda s: int(s.split(':')[1])
+        with open(result_path, "r") as f:
+            raw_lines = f.readlines()[5:-1]
+            raw_predictions = [line.split()[prediction_index]
+                           for line in raw_lines]
+            self.predictions = [ordConversion(
+                prediction) for prediction in raw_predictions]
+
+    def predict(self,result_path="/home/h205c/recommendation_engine/prediction.csv"):
+        """
+        This function runs the model that is already trained and stores the prediction results
+        """ 
+        # Make sure the 'train' function was called
+        if not self.path_to_model_file:
+            raise Exception("Please train a model first")
+
+        # Run prediction
+        command = "java -cp {} {} -T {} -l {} -p 0 1> {}".format(
+          self.weka_path, self.weka_command, self._convert(self.validation_data), self.path_to_model_file, result_path) 
+        subprocess.check_output(command, shell=True)
+        
+        # Convert weka prediction to a list of results 
+        self._read_weka_output(result_path)
+    
+    def sieve(self):
+        """
+        This function returns a dataframe of successful reactions
+        """
+        # Make sure the 'predict' function was called
+        if not self.predictions:
+            raise Exception("No predictions found")
+
+        validation_dataframe = pd.read_csv(self.validation_data)
+        validation_dataframe['prediction'] = self.predictions
+        return validation_dataframe.loc[validation_dataframe['prediction'] == 1]
+
 
 
 if __name__ == "__main__":
 
     # Running order: generate(), generateDescriptor(), expandedgrid()
-    #os.environ['CXCALC_PATH'] = '/home/h205c/chemaxon/bin'
-    os.environ['CXCALC_PATH'] = '/Applications/MarvinSuite/bin'
+   #  os.environ['CXCALC_PATH'] = '/home/h205c/chemaxon/bin'
+   #  # os.environ['CXCALC_PATH'] = '/Applications/MarvinSuite/bin'
+   #  turl = "../sample_data/triples_and_amounts.json"
+   #  gurl = "../sample_data/grid_params.json"
+   #  test = Generator(turl, gurl)
+   #  #test.generate_grid()
+   #  desf = "../sample_data/descriptors_list.json"
+   #  outputfile = "/home/h205c/recommendation_engine/sample_data/descriptoroutput.txt"
+   # # test.generate_descriptors(desf,outputfile)
+   #  combos = test.generate_expanded_grid()
+   #  print(combos)
 
-    turl = "../sample_data/triples_and_amounts.json"
-    gurl = "../sample_data/grid_params.json"
-    test = Generator(turl, gurl)
-    test.generate_grid()
-    # print(test.all_combos)
 
-    desf = '../sample_data/descriptors_list.json'
-    test.generate_descriptors(desf)
-    # print(test.descriptor_dataframe)
 
-    test.generate_expanded_grid()
-    # print(test.all_combos_expanded)
 
-    # csvfile = "opnew.csv"
-    # desc = test.expand_grid(csvfile)
-    mlmodel = MLmodel()
-    df = mlmodel.sieve(test.all_combos_expanded)
-    print(df)
+    """
+    Testing MLmodel class only. After calling train,predict,and sieve: 
+    generate train.csv>test.csv>train.arff>test.arff>J48.model>predict.csv
+    return a data frame of successful reactions
+
+    TODO: 
+    To do the validation, you need to do the following data preprocessing manually
+    1. Remove attributes starting with XXX and implement whitelist in train()
+    2. Convert attribute of "outcome" from regression (numeric) to classification {0,1} 
+    3. Remove the attribute "purity", which is the second outcome instead of one of the training parameters 
+    4. For validation data, change 'outcome' to '?' for weka to make predictions (see weka documentation)
+    Bugs
+    1. _convert() works but there's some error about reading unknown attributes
+    2. in train(): the weka command doesnt work as it says train and test are not compatible.
+    I checked that train.arff and test.arff have same attributes. Maybe due to bug 1?
+    3. Due to the previous errors I couldn't get the output yet, but the files
+    are generated correctly from start to end
+    """
+    all_data = '/home/h205c/recommendation_engine/sample_data/nature17439-s2.csv'
+    validation_file = "/home/h205c/recommendation_engine/validation.csv"
+    mlmodel = MLmodel("J48", all_data, validation_file)
+    mlmodel.train()
+    mlmodel.predict()
+    print(mlmodel.sieve())
+
+
+
+
+    #df = mlmodel.sieve(test.all_combos_expanded)
+    #print(df)
     # print(df)
+    
