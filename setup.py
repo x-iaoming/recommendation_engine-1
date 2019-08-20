@@ -5,14 +5,14 @@ with open('README.md', 'r') as f:
 
 setuptools.setup(
     name='chemrecommender',
-    version='0.0.3',
+    version='0.0.1',
     author="DRP Project",
     author_email="darkreactionproject@haverford.edu",
     description="A standalone module to build a recommender pipeline",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/darkreactions/recommendation_engine",
-    packages=['chemrecommender'],
+    packages=['recommender'],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

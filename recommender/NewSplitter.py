@@ -5,6 +5,7 @@ import csv
 import random
 import numpy as np
 
+
 class NewSplitter:
     """
     The NewSplitter class.
@@ -18,23 +19,24 @@ class NewSplitter:
         self.margin_percent = margin_percent
         self.num_splits = num_splits
 
-    def split(self, reactions):
+    def split(self, reactions, reactionsdf):
         """Actually perform the split."""
         test_index = []
-        triplet_to_count, triplet_to_index, bad_index = self._count_compound_sets(reactions)
+        triplet_to_count, triplet_to_index, bad_index = self._count_compound_sets(
+            reactions)
         key_counts = triplet_to_count.items()
-        testkeys = self._get_test_keys(key_counts)  #set of tuples, where each tuple is a triplet that falls into the test corpus
-        reactionsdf = pd.read_csv(reactions,low_memory=False)
+        # set of tuples, where each tuple is a triplet that falls into the test corpus
+        testkeys = self._get_test_keys(key_counts)
+        #reactionsdf = reactions
         for i in range(len(reactionsdf)):
             if triplet_to_index[i] in testkeys:
-               test_index.append(i)    
+                test_index.append(i)
 
         testdf = reactionsdf.iloc[test_index]
-        traindf = reactionsdf.drop(test_index + bad_index, axis = 0)
+        traindf = reactionsdf.drop(test_index + bad_index, axis=0)
 
-        testdf.to_csv("../test.csv",index=False)
-        traindf.to_csv("../train.csv",index=False)
-
+        testdf.to_csv("./sample_data/test.csv", index=False)
+        traindf.to_csv("./sample_data/train.csv", index=False)
 
     def _get_test_keys(self, key_counts):
         random.shuffle(list(key_counts))
@@ -62,7 +64,7 @@ class NewSplitter:
             # Try skipping it
             else:
                 raise RuntimeError(
-                    'Failed to make a split under the given parameters.')       
+                    'Failed to make a split under the given parameters.')
 
         return test_keys
 
@@ -76,7 +78,7 @@ class NewSplitter:
         with open(reactions) as csvfile:
             triplet_to_count = {}
             index_to_triplet = {}
-            bad_index = [] #indices of rows that have missing values
+            bad_index = []  # indices of rows that have missing values
             index = -1
             readCSV = csv.reader(csvfile, delimiter=',')
             for row in readCSV:
@@ -88,12 +90,13 @@ class NewSplitter:
                 index_to_triplet[index] = triplet
                 if index > 0 and Org1 != '-1' and InOrg2 != '-1':
                     value = triplet_to_count.get(triplet, 0)
-                    if value !=0:
-                       triplet_to_count[triplet] += 1
-                    else: triplet_to_count[triplet] = 1
-                else: bad_index.append(index) 
+                    if value != 0:
+                        triplet_to_count[triplet] += 1
+                    else:
+                        triplet_to_count[triplet] = 1
+                else:
+                    bad_index.append(index)
             return triplet_to_count, index_to_triplet, bad_index
-       
 
 
 # if __name__ == "__main__":
