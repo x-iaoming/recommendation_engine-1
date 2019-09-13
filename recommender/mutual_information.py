@@ -5,6 +5,7 @@ from scipy.stats import multivariate_normal
 import math
 import copy
 from typing import Any
+import operator
 
 
 DESCRIPTORS_TO_REMOVE = ['compound_0_amount_grams', 'compound_1_amount_grams',
@@ -275,6 +276,25 @@ class MutualInformation:
             delta_mutual_info = self.groups[best_compounds]['pdf'].delta_mi(
                 candidate)
         return delta_mutual_info
+
+    def get_recommended_reactions(self, num_reactions, potential_reactions):
+        """
+            Returns top 'num_reactions' with highest MI values
+
+            Args:
+                num_reactions: Top n reactions to be returned
+                potential_reactions: List of reaction descriptors to test against
+
+            Returns:
+                Top n descriptors
+        """
+        mi_values = {}
+        for i, descriptors in enumerate(potential_reactions):
+            mi_values[i] = self.get_delta_mutual_info(descriptors)
+
+        sorted_mi = sorted(mi_values.items(), key=lambda kv: kv[1])
+
+        return sorted_mi[:num_reactions]
 
 
 if __name__ == "__main__":

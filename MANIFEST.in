@@ -1,0 +1,4 @@
+include sample_data/descriptors_list.json
+include sample_data/grid_params.json
+include sample_data/triples_and_amounts.json
+include test_data_full.csv
