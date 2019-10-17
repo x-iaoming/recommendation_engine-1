@@ -16,7 +16,7 @@ class WekaModel:
                  model_name,
                  all_data_path,
                  validation_data_path,
-                 weka_path="/Volumes/weka-3-8-3/weka-3-8-3/weka.jar",
+                 weka_path="/home/h205c/Downloads/weka-3-8-3/weka.jar",
                  descriptor_whitelist=[]):
         """
         It initializes with all_data_path and validation_data_path, which are csv files. They need to have the exact same attributes.
@@ -31,12 +31,18 @@ class WekaModel:
 
         self.descriptor_whitelist = descriptor_whitelist
 
-        self.java_command = 'java --add-opens=java.base/java.lang=ALL-UNNAMED'
+        self.java_command = 'java'
 
         if self.model_name == "J48":
             self.weka_command = "weka.classifiers.trees.J48"
         elif self.model_name == "SVM":
             self.weka_command = "weka.classifiers.functions.SMO"
+        elif self.model_name == "LogisticRegression":
+            self.weka_command = "weka.classifiers.functions.Logistic"
+        elif self.model_name == "KNN":
+            self.weka_command = "weka.classifiers.lazy.IBk"
+        elif self.model_name == "RandomForest":
+            self.weka_command = "weka.classifiers.meta.FilteredClassifier"
         else:
             raise Exception("This model is not recognizable")
 
@@ -65,10 +71,12 @@ class WekaModel:
         os.remove('{}_new.arff'.format(file_path[:-4]))
         return file_path[:-4]+'.arff'
 
-    def train(self, path_to_model_file=None):
+    def train(self, path_to_model_file=None, k=1, i=100):
         """
         This function splits the data set and writes train and test files
         It then trains and writes a model
+        k is the number of neigbhors for knn algorithm
+        i is the number for random forest algorithm
         """
         # TODO: Filters out descriptors not in the whitelist
         # self.filter(self.all_data,descriptor_whitelist)
@@ -82,13 +90,34 @@ class WekaModel:
         # Set and run weka model commands
         if not path_to_model_file:
             self.path_to_model_file = self.model_name+'.model'
-        train_arff = self._convert("./sample_data/train.csv")
-        test_arff = self._convert("./sample_data/test.csv")
-        command = "{} -cp {} {} -d {} -t {} -T {} -p 0".format(self.java_command,
-                                                               self.weka_path,
-                                                               self.weka_command,
-                                                               self.path_to_model_file,
-                                                               train_arff, test_arff)
+        train_arff = self._convert("../sample_data/train.csv")
+        test_arff = self._convert("../sample_data/test.csv")
+
+        if self.weka_command == "weka.classifiers.functions.SMO":
+            # SVM
+            command = "{} -cp {} {} -d {} -t {} -T {} -K 'weka.classifiers.functions.supportVector.Puk -O 0.5 -S 7' -p 0".format(
+                                                                   self.java_command,
+                                                                   self.weka_path,
+                                                                   self.weka_command,
+                                                                   self.path_to_model_file,
+                                                                   train_arff, test_arff)
+        elif self.weka_command == "weka.classifiers.meta.FilteredClassifier":
+            # RandomForest
+            command = "{} -cp {} {} -d {} -t {} -T {} -p 0 -W weka.classifiers.trees.RandomForest -- -I {}".format(
+                                                                   self.java_command,
+                                                                   self.weka_path,
+                                                                   self.weka_command,
+                                                                   self.path_to_model_file,
+                                                                   train_arff, test_arff,i)
+        else:
+            # J48, LogisticRegression
+            command = "{} -cp {} {} -d {} -t {} -T {} -p 0".format(self.java_command,
+                                                                   self.weka_path,
+                                                                   self.weka_command,
+                                                                   self.path_to_model_file,
+                                                                   train_arff, test_arff)
+            if self.weka_command == "weka.classifiers.lazy.IBk":
+                command.append(" -K {}".format(k))
 
         subprocess.check_output(command, shell=True)
 
@@ -113,7 +142,22 @@ class WekaModel:
             self.predictions = [ordConversion(
                 prediction) for prediction in raw_predictions]
 
-    def predict(self, result_path="./sample_data/prediction.csv"):
+    def read_actual(self, result_path):
+        """
+        This function reads a weka prediction output file and stores the prediction results as a list of 0 and 1
+        Used in 'predict'
+        """
+        prediction_index = 1
+        def ordConversion(s): return int(s.split(':')[1])
+        with open(result_path, "r") as f:
+            raw_lines = f.readlines()[5:-1]
+            raw_predictions = [line.split()[prediction_index]
+                               for line in raw_lines]
+            self.actual = [ordConversion(
+                prediction) for prediction in raw_predictions]
+        
+
+    def predict(self, result_path="../sample_data/prediction.csv"):
         """
         This function runs the model that is already trained and stores the prediction results
         """
@@ -135,6 +179,7 @@ class WekaModel:
 
         # Convert weka prediction to a list of results
         self._read_weka_output(result_path)
+        self.read_actual(result_path)
 
     def sieve(self):
         """
@@ -147,3 +192,5 @@ class WekaModel:
         validation_dataframe = pd.read_csv(self.validation_data)
         validation_dataframe['prediction'] = self.predictions
         return validation_dataframe.loc[validation_dataframe['prediction'] == 1]
+
+    
