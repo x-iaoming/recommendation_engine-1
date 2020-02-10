@@ -191,6 +191,7 @@ class WekaModel:
 
         validation_dataframe = pd.read_csv(self.validation_data)
         validation_dataframe['prediction'] = self.predictions
+        self.validation_prediction = validation_dataframe
         return validation_dataframe.loc[validation_dataframe['prediction'] == 1]
 
     

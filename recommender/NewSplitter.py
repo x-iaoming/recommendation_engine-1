@@ -33,7 +33,7 @@ class NewSplitter:
                 test_index.append(i)
 
         testdf = reactionsdf.iloc[test_index]
-        traindf = reactionsdf.drop(test_index + bad_index, axis=0)
+        traindf = reactionsdf.drop(test_index + bad_index[:-1], axis=0)
 
         testdf.to_csv("../sample_data/test.csv", index=False)
         traindf.to_csv("../sample_data/train.csv", index=False)

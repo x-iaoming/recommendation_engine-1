@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 import os
 import csv
+from ml_models import WekaModel
 
 os.environ['CXCALC_PATH'] = '/home/h205c/chemaxon/bin'
 
@@ -71,6 +72,7 @@ class Generator:
                                           params)]
         self.all_combos = pd.DataFrame.from_records(self.all_combos)
         self.all_combos.columns = names
+
         return self.all_combos
 
     def _generate_column_names(self):
@@ -88,6 +90,7 @@ class Generator:
             names.append(grid_param)
 
         return names
+
     # TODO: Fixed bug. When I ran this function, it shows that "can't convert list to str implicitly" fpr line 110.
 
     def generate_descriptors(self, descriptor_list, output_filename):
@@ -106,14 +109,13 @@ class Generator:
 
         ph_values = self.params_grid_data['reaction_pH']
 
-        # print(ph_values)
+        print(self.compound_set)
         cag = ChemAxonDescriptorGenerator(self.compound_set,
                                           descriptor_list,
                                           list(ph_values))
 
-        self.descriptor_dataframe = cag.generate(
-            output_filename, dataframe=True)
-        # print(self.descriptor_dataframe)
+        self.descriptor_dataframe = cag.generate(output_filename, dataframe=True)
+        print(self.descriptor_dataframe)
         # print(
         # self.descriptor_dataframe[['Compound'] + [col for col in self.descriptor_dataframe.columns if ('7' in col)]])
 
@@ -180,48 +182,48 @@ class Generator:
         self.all_combos_expanded.to_csv("../sample_data/combos.csv")
         return self.all_combos_expanded
 
-
 if __name__ == "__main__":
 
-    #os.environ['CXCALC_PATH'] = '/home/h205c/chemaxon/bin'
+    os.environ['CXCALC_PATH'] = '/home/h205c/chemaxon/bin'
     #os.environ['CXCALC_PATH'] = '/Applications/MarvinSuite/bin'
+
+    # Generate reactions from nature paper
+    gurl = "../sample_data/nature_grid_params.json"
+    turl = "../sample_data/nature_triples_and_amounts.json"
     
-    # Generate possible reactions
+    # Generate possible reactions from given parameters
     # turl = "../sample_data/triples_and_amounts.json"
     # gurl = "../sample_data/grid_params.json"
-    # test = Generator(turl, gurl)
-    # test.generate_grid()
-    # desf = "../sample_data/descriptors_list.json"
-    # outputfile = "../sample_data/descriptoroutput.txt"
-    # test.generate_descriptors(desf, outputfile)
+    test = Generator(turl, gurl)
+    test.generate_grid()
+    desf = "../sample_data/descriptors_list.json"
+    outputfile = "../sample_data/descriptoroutput.txt"
+    test.generate_descriptors(desf, outputfile)
     
     # Print generator output(saved to file as well)
-    # combos = test.generate_expanded_grid()
-    # print(combos)
-    
+    combos = test.generate_expanded_grid()
 
     # Below is working for direct import of csv files 
-    all_data = '../sample_data/nature17439-s2.csv'
-    validation_file = "../sample_data/validation.csv"
-    # all_data = '../sample_data/combos.csv'
-    # validation_file = "../sample_data/combos.csv"
-    
+    # all_data = "../nature_reactions.csv"
+    # validation_file = "../sample_data/validation.csv"
+    all_data = '../sample_data/combos.csv'
+    validation_file = "../sample_data/combos.csv"
 
     # Filter whitelist
-    from ml_models import WekaModel
-    data = pd.read_csv(all_data, low_memory=False)
-    whitelist = [col for col in data.columns if 'XXX' not in col]
+    
+    all_data_df = pd.read_csv(all_data, low_memory=False)
+    whitelist = [col for col in all_data_df.columns if 'XXX' not in col]
 
 
     # Run ML model
     # Avaliable models are SVM, J48, LogisticRegression, KNN, RandomForest
-    mlmodel = WekaModel("RandomForest", all_data, validation_file,
-                        descriptor_whitelist=whitelist)
+    mlmodel = WekaModel("SVM", all_data, validation_file,descriptor_whitelist=whitelist)
     # optional parameter for train():
     # k for number of neighbors for KNN, i for randomforest number
     mlmodel.train()
     mlmodel.predict()
-    mlmodel.sieve()
+    success = mlmodel.sieve()
+    validation_prediction = mlmodel.validation_prediction
 
     # Output predictions
     correct = 0
@@ -229,5 +231,31 @@ if __name__ == "__main__":
     	if mlmodel.predictions[i] == mlmodel.actual[i]:
     		correct +=1
     print("Accuracy:"+"{:.3%}".format(correct/len(mlmodel.predictions)))
+
+    from mutual_information import *
+    # DESCRIPTORS_TO_REMOVE = ['compound_0_amount_grams', 'compound_1_amount_grams',
+    #                      'compound_2_amount_grams', 'labGroup', 'notes', 'compound_0_role',
+    #                      'compound_1_role', 'compound_2_role', 'compound_0', 'compound_1',
+    #                   'compound_2', 'compound_0_amount', 'compound_1_amount',
+    #                      'compound_2_amount']
+
+    compound_column_labels = ['XXXi0rg1', 'XXXi0rg2', 'XXXi0rg3']
+
+    # convert bool to int and ? to 0
+    all_data_df['slowCool']= pd.to_numeric(all_data_df['slowCool'], errors='coerce').fillna(0)
+    all_data_df['leak']= pd.to_numeric(all_data_df['leak'], errors='coerce').fillna(0)
+
+    # calculate mutual information on all_data_df
+    mi = MutualInformation(
+       all_data_df, 'outcome', compound_column_labels, whitelist)
+
+    # convert bool to int 
+    success['slowCool'] = pd.to_numeric(success['slowCool'], errors='coerce').fillna(0)
+    success['leak'] = pd.to_numeric(success['leak'], errors='coerce').fillna(0)
+
+    # calculate the change in MI and get top reactions
+    recommended_reactions = mi.get_recommended_reactions(20,success[whitelist].values)
+    print(recommended_reactions)
+
 
 

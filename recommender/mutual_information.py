@@ -61,6 +61,8 @@ class Pdf:
                 float(len(self.group['result']))
             self.fail_mean = 1 - self.success_mean
 
+            #print(self.group['descriptors'])
+
             self.descriptor_mean = np.mean(
                 self.group['descriptors'], axis=0)
             self.descriptor_cov = np.cov(self.group['descriptors'].T)
@@ -237,7 +239,9 @@ class MutualInformation:
             try:
                 grp['descriptors'] = np.array(grp['descriptors']).astype(float)
             except:
-                print(grp['descriptors'])
+                print('Descriptors are not numeric')
+                print(len(grp['descriptors'][0]))
+                print(self.descriptors.dtypes)
 
         return groups
 
@@ -292,25 +296,26 @@ class MutualInformation:
         for i, descriptors in enumerate(potential_reactions):
             mi_values[i] = self.get_delta_mutual_info(descriptors)
 
-        sorted_mi = sorted(mi_values.items(), key=lambda kv: kv[1])
+        sorted_mi = sorted(mi_values.items(), key=lambda kv: kv[1], reverse=True)
 
         return sorted_mi[:num_reactions]
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
     # dataset = pd.read_csv('~/test_data.csv')
-    dataset = pd.read_csv('~/test_data_full.csv', low_memory=False)
-    dataset_org = dataset.iloc[:6000]
-    dataset_new = dataset.iloc[-100:]
-    descriptors_to_keep = [
-        col for col in dataset.columns if col not in DESCRIPTORS_TO_REMOVE]
-    desc_to_keep_testing = [col for col in dataset.columns if col not in DESCRIPTORS_TO_REMOVE] + [
-        'boolean_crystallisation_outcome_manual_0']
-    dataset_new = dataset_new[desc_to_keep_testing].values
-    compound_column_labels = ['compound_0', 'compound_1', 'compound_2']
-    mi = MutualInformation(
-        dataset_org, 'boolean_crystallisation_outcome_manual_0', compound_column_labels, descriptors_to_keep)
 
-    #print([group['pdf'].descriptor_normal for group in mi.groups.values()])
-    print([mi.get_delta_mutual_info(row[:268].astype(float))
-           for row in dataset_new])
+    # dataset = pd.read_csv('~/test_data_full.csv', low_memory=False)
+    # dataset_org = dataset.iloc[:6000]
+    # dataset_new = dataset.iloc[-100:]
+    # descriptors_to_keep = [
+    #     col for col in dataset.columns if col not in DESCRIPTORS_TO_REMOVE]
+    # desc_to_keep_testing = [col for col in dataset.columns if col not in DESCRIPTORS_TO_REMOVE] + [
+    #     'boolean_crystallisation_outcome_manual_0']
+    # dataset_new = dataset_new[desc_to_keep_testing].values
+    # compound_column_labels = ['compound_0', 'compound_1', 'compound_2']
+    # mi = MutualInformation(
+    #     dataset_org, 'boolean_crystallisation_outcome_manual_0', compound_column_labels, descriptors_to_keep)
+
+    # #print([group['pdf'].descriptor_normal for group in mi.groups.values()])
+    # print([mi.get_delta_mutual_info(row[:268].astype(float))
+    #        for row in dataset_new])
