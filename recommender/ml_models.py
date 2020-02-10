@@ -144,8 +144,8 @@ class WekaModel:
 
     def read_actual(self, result_path):
         """
-        This function reads a weka prediction output file and stores the prediction results as a list of 0 and 1
-        Used in 'predict'
+        This function reads a weka prediction output file and stores the *actual* results as a list of 0 and 1
+        Used in calculating accuracy in main of Generator.py
         """
         prediction_index = 1
         def ordConversion(s): return int(s.split(':')[1])
